@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -10,32 +9,10 @@ import '../../../models/Job.dart';
 import '../../../models/Employee.dart';
 import '../../../models/Account.dart';
 import 'build_table_1.dart';
-import 'build_table_10.dart';
-import 'build_table_11.dart';
-import 'build_table_12.dart';
-import 'build_table_13.dart';
-import 'build_table_14.dart';
-import 'build_table_15.dart';
-import 'build_table_16.dart';
-import 'build_table_17.dart';
-import 'build_table_18.dart';
-import 'build_table_19.dart';
 import 'build_table_2.dart';
-import 'build_table_20.dart';
-import 'build_table_21.dart';
-import 'build_table_22.dart';
-import 'build_table_23.dart';
-import 'build_table_24.dart';
-import 'build_table_25.dart';
-import 'build_table_26.dart';
-import 'build_table_27.dart';
-import 'build_table_3.dart';
 import 'build_table_4.dart';
 import 'build_table_5.dart';
-import 'build_table_6.dart';
 import 'build_table_7.dart';
-import 'build_table_8.dart';
-import 'build_table_9.dart';
 
 Future<void> printReport(
   Report report,
@@ -54,7 +31,7 @@ Future<void> printReport(
   final font = await PdfGoogleFonts.robotoRegular();
 
   // Font size constant
-  const double fontSize = 8.5;
+  const double fontSize = 8.0;
 
   pdf.addPage(
     pw.Page(
@@ -63,73 +40,8 @@ Future<void> printReport(
         return pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            buildTable1(font, fontSize, cmToPoints, department),
-            buildTable2(font, fontSize, cmToPoints, job, employee),
-            buildTable4(
-              font,
-              fontSize,
-              cmToPoints,
-              report,
-              department,
-              dateFormat,
-            ),
-            buildTable5(font, fontSize, cmToPoints, report, dateFormat),
-            buildTable7(font, fontSize, cmToPoints, report, account, department),
+            buildTable7(font, fontSize, cmToPoints, report, account, department, dateFormat, job, employee),
 
-
-            // buildTable10(font, fontSize, cmToPoints),
-            // buildTable11(font, fontSize, cmToPoints),
-            // buildTable12(font, fontSize, cmToPoints, report, department),
-            // buildTable13(font, fontSize, cmToPoints, report, department),
-            // buildTable14(font, fontSize, cmToPoints, report, department),
-            // buildTable15(font, fontSize, cmToPoints, report, department),
-            // buildTable16(font, fontSize, cmToPoints, report, department),
-            // buildTable17(font, fontSize, cmToPoints, report, department),
-            // buildTable18(font, fontSize, cmToPoints, report, department),
-            // buildTable19(font, fontSize, cmToPoints, report, department),
-            // buildTable20(font, fontSize, cmToPoints, report, department),
-            // buildTable21(font, fontSize, cmToPoints, report, department),
-            // buildTable22(font, fontSize, cmToPoints, report, department),
-            // buildTable23(
-            //   font,
-            //   fontSize,
-            //   cmToPoints,
-            //   report,
-            //   department,
-            //   dateFormat,
-            // ),
-            // buildTable24(
-            //   font,
-            //   fontSize,
-            //   cmToPoints,
-            //   report,
-            //   department,
-            //   dateFormat,
-            // ),
-            // buildTable25(
-            //   font,
-            //   fontSize,
-            //   cmToPoints,
-            //   report,
-            //   department,
-            //   dateFormat,
-            // ),
-            // buildTable26(
-            //   font,
-            //   fontSize,
-            //   cmToPoints,
-            //   report,
-            //   department,
-            //   dateFormat,
-            // ),
-            // buildTable27(
-            //   font,
-            //   fontSize,
-            //   cmToPoints,
-            //   report,
-            //   department,
-            //   dateFormat,
-            // ),
           ],
         );
       },
