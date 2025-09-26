@@ -11,7 +11,7 @@ pw.Widget buildTable5(
     DateFormat dateFormat,
     ) {
   return pw.Table(
-    border: pw.TableBorder.all(width: cmToPoints(0.01)),
+    border: null,
     columnWidths: {
       0: pw.FixedColumnWidth(cmToPoints(4)),
       1: pw.FixedColumnWidth(cmToPoints(10)),

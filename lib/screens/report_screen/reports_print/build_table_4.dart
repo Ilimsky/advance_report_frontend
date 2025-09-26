@@ -13,7 +13,7 @@ pw.Widget buildTable4(
     DateFormat dateFormat,
     ) {
   return pw.Table(
-    border: pw.TableBorder.all(width: cmToPoints(0.01)),
+    border: null,
     columnWidths: {
       0: pw.FixedColumnWidth(cmToPoints(4)),
       1: pw.FixedColumnWidth(cmToPoints(3)),
@@ -79,7 +79,7 @@ pw.Widget buildTable4(
           pw.Padding(
             padding: pw.EdgeInsets.all(cmToPoints(0.2)),
             child: pw.Container(
-              alignment: pw.Alignment.centerRight,
+              alignment: pw.Alignment.centerLeft,
               child: pw.Text(
                 'Проводка №',
                 style: pw.TextStyle(font: font, fontSize: fontSize),
