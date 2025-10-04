@@ -47985,7 +47985,7 @@ $S:397}
 A.mN.prototype={
 a9a(){var s=this.a,r=s.u9$
 r===$&&A.b()
-r.sKf("http://localhost:8070/api")
+r.sKf("https://advance-report.onrender.com/api")
 s.u9$.sKC(B.Rs)
 r=s.u9$
 r.e=B.Rp
