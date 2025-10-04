@@ -1,6 +1,7 @@
 import 'package:advance_report_frontend/providers/binding_provider.dart';
 import 'package:advance_report_frontend/providers/department_provider.dart';
 import 'package:advance_report_frontend/providers/employee_provider.dart';
+import 'package:advance_report_frontend/providers/user_department_binding_provider.dart';
 import 'package:advance_report_frontend/screens/create_report_screen.dart';
 import 'package:advance_report_frontend/screens/report_screen/reports_screen.dart';
 import 'package:advance_report_frontend/service/api_service.dart';
@@ -53,6 +54,10 @@ Future<void> main() async {
         ChangeNotifierProxyProvider<ApiService, ReportProvider>(
           create: (_) => ReportProvider(ApiService(authService.dioInstance, authService)),
           update: (_, apiService, __) => ReportProvider(apiService),
+        ),
+        ChangeNotifierProxyProvider<ApiService, UserDepartmentBindingProvider>(
+          create: (_) => UserDepartmentBindingProvider(ApiService(authService.dioInstance, authService)),
+          update: (_, apiService, __) => UserDepartmentBindingProvider(apiService),
         ),
       ],
       child: const MyApp(),
@@ -118,7 +123,7 @@ class _HomeScreenState extends State<HomeScreen> {
         currentIndex: _selectedIndex,
         onTap: (index) => setState(() => _selectedIndex = index),
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.list), label: 'Список отчетов'),
+          BottomNavigationBarItem(icon: Icon(Icons.list), label: 'Журнал учета авансовых отчетов'),
           BottomNavigationBarItem(icon: Icon(Icons.add), label: 'Создание отчетов'),
         ],
       ),

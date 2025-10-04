@@ -7,6 +7,7 @@ import 'package:pdf/widgets.dart' as pw;
 import '../../../models/Account.dart';
 import '../../../models/Employee.dart';
 import '../../../models/Report.dart';
+import 'number_to_words.dart';
 
 pw.Widget buildTable(
   pw.Font font,
@@ -470,7 +471,9 @@ pw.Widget buildTable(
               border: pw.Border.all(width: cmToPoints(0.01)),
             ),
             child: pw.Text(
-              account.name,
+              account.name.length > 4
+                  ? account.name.substring(0, 4)
+                  : account.name,
               style: pw.TextStyle(font: font, fontSize: fontSize),
               textAlign: pw.TextAlign.center,
             ),
@@ -888,7 +891,7 @@ pw.Widget buildTable(
               ),
             ),
             child: pw.Text(
-              '${report.recognizedAmount} сом',
+              '${report.recognizedAmount} (${numberToWords(report.recognizedAmount)})',
               style: pw.TextStyle(font: font, fontSize: fontSize),
             ),
           ),

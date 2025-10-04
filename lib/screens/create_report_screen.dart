@@ -1,4 +1,3 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -12,8 +11,13 @@ import '../providers/department_provider.dart';
 import '../providers/employee_provider.dart';
 import '../providers/job_provider.dart';
 import '../providers/report_provider.dart';
+import '../providers/user_department_binding_provider.dart';
+import '../providers/user_provider.dart';
+import '../service/auth_service.dart';
 
 class CreateReportScreen extends StatefulWidget {
+  const CreateReportScreen({super.key});
+
   @override
   _CreateReportScreenState createState() => _CreateReportScreenState();
 }
@@ -31,26 +35,200 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
   DateTime? selectedDateApproved;
   DateTime? selectedDateCreated;
 
-  // Контроллеры для текстовых полей
   final TextEditingController _dateReceivedController = TextEditingController();
   final TextEditingController _amountIssuedController = TextEditingController();
   final TextEditingController _dateApprovedController = TextEditingController();
   final TextEditingController _purposeController = TextEditingController();
   final TextEditingController _recognizedAmountController =
-      TextEditingController();
+  TextEditingController();
   final TextEditingController _commentsController = TextEditingController();
 
-  // Состояние для отображения полей просмотра
   bool _showViewFields = false;
 
-  // Список строк для отображения
   final List<Map<String, String>> _viewFields = [];
 
-  Future<void> _selectDate(
-    BuildContext context,
-    TextEditingController controller,
-    void Function(DateTime) onDateSelected,
-  ) async {
+  final List<String> purposeTemplates = [
+    'Оплата за интернет за (месяц) 202. г. согл. чека №. от (день месяц) 202. г.',
+    'Оплата за электричество за (месяц) 202. г. согл. чека №. от (день месяц) 202. г.',
+    'Оплата за аренду за (месяц) 202. г. согл. чека №. от (день месяц) 202. г.',
+    'ГСМ по путевому за (месяц) 202. (Ф.И.О)',
+    'Оплата за доставку через курьерскую службу (название) согл. квит. №. от (день месяц) 202.',
+    'Покупка бензина для генератора согл. чека №. от (день месяц) 202.',
+  ];
+
+  bool _initialDepartmentSet = false;
+  int? _currentUserId; // Добавляем ID текущего пользователя
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeDefaultValues();
+
+    print('CreateReportScreen: initState, пользователь: ${Provider.of<AuthService>(context, listen: false).username}');
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _getCurrentUserId();
+    });
+  }
+
+  void _getCurrentUserId() async {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+
+    if (!authService.isAuthenticated || authService.username == null) {
+      print('Пользователь не аутентифицирован');
+      return;
+    }
+
+    // Ждем загрузки пользователей
+    if (userProvider.users.isEmpty) {
+      print('Загружаем список пользователей...');
+      await userProvider.fetchUsers();
+    }
+
+    try {
+      final currentUser = userProvider.users.firstWhere(
+            (user) => user.username == authService.username,
+      );
+
+      setState(() {
+        _currentUserId = currentUser.id;
+      });
+
+      print('Установлен ID текущего пользователя: $_currentUserId');
+
+      // Сразу после установки ID пользователя загружаем привязки
+      _loadUserBindings();
+
+    } catch (e) {
+      print('Ошибка: Пользователь "${authService.username}" не найден в системе');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ваш пользователь не найден в системе')),
+      );
+    }
+  }
+
+  void _loadUserBindings() {
+    final bindingProvider = Provider.of<UserDepartmentBindingProvider>(context, listen: false);
+
+    if (bindingProvider.bindings.isEmpty) {
+      print('Загружаем привязки пользователей...');
+      bindingProvider.fetchBindings().then((_) {
+        if (mounted) {
+          print('Привязки загружены, устанавливаем филиал...');
+          _setCurrentUserDepartment();
+        }
+      }).catchError((error) {
+        print('Ошибка загрузки привязок: $error');
+      });
+    } else {
+      print('Привязки уже загружены, устанавливаем филиал...');
+      _setCurrentUserDepartment();
+    }
+  }
+
+  void _setCurrentUserDepartment() {
+    if (_currentUserId == null) {
+      // print('ID пользователя не установлен');
+      return;
+    }
+
+    final bindingProvider = Provider.of<UserDepartmentBindingProvider>(context, listen: false);
+    final departmentProvider = Provider.of<DepartmentProvider>(context, listen: false);
+
+    // print('Ищем привязку для пользователя $_currentUserId');
+    // print('Доступно привязок: ${bindingProvider.bindings.length}');
+    // print('Доступно филиалов: ${departmentProvider.departments.length}');
+
+    // Детальная отладка привязок
+    // print('Детальная информация о привязках:');
+    for (var binding in bindingProvider.bindings) {
+      print('  - $binding');
+    }
+
+    try {
+      // Ищем привязку для текущего пользователя
+      final userBinding = bindingProvider.bindings.firstWhere(
+            (binding) => binding.userId == _currentUserId,
+      );
+
+      // print('Найдена привязка: userId=${userBinding.userId}, departmentId=${userBinding.departmentId}');
+
+      // Находим соответствующий филиал
+      final userDepartment = departmentProvider.departments.firstWhere(
+            (dept) => dept.id == userBinding.departmentId,
+      );
+
+      // print('Найден филиал: ${userDepartment.name} (id: ${userDepartment.id})');
+
+      setState(() {
+        selectedDepartmentId = userDepartment.id;
+        selectedDepartment = userDepartment;
+        _initialDepartmentSet = true;
+      });
+
+      // print('Автоматически установлен филиал: ${userDepartment.name}');
+
+    } catch (e) {
+      // print('Филиал для пользователя $_currentUserId не найден: $e');
+      // print('Доступные привязки: ${bindingProvider.bindings.map((b) => 'userId:${b.userId}->dept:${b.departmentId}').toList()}');
+
+      // Отложенный показ SnackBar
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Для вашего пользователя не настроен филиал')),
+        );
+      });
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+  }
+
+
+
+  void _initializeDefaultValues() {
+    // Устанавливаем сегодняшнюю дату для даты получения и даты утверждения
+    final today = DateTime.now();
+    selectedDateReceived = today;
+    selectedDateApproved = today;
+
+    _dateReceivedController.text = DateFormat('yyyy-MM-dd').format(today);
+    _dateApprovedController.text = DateFormat('yyyy-MM-dd').format(today);
+
+    // Слушатель для автоматического обновления признанной суммы при изменении выданной суммы
+    _amountIssuedController.addListener(_updateRecognizedAmount);
+  }
+
+  void _updateRecognizedAmount() {
+    if (_recognizedAmountController.text != _amountIssuedController.text) {
+      // Обновляем только если пользователь не редактировал признанную сумму вручную
+      // или если признанная сумма пустая
+      if (_recognizedAmountController.text.isEmpty ||
+          _recognizedAmountController.text == _getPreviousAmountIssued()) {
+        setState(() {
+          _recognizedAmountController.text = _amountIssuedController.text;
+        });
+      }
+    }
+    _setPreviousAmountIssued(_amountIssuedController.text);
+  }
+
+  String? _previousAmountIssued;
+
+  String _getPreviousAmountIssued() {
+    return _previousAmountIssued ?? '';
+  }
+
+  void _setPreviousAmountIssued(String value) {
+    _previousAmountIssued = value;
+  }
+
+  Future<void> _selectDate(BuildContext context,
+      TextEditingController controller,
+      void Function(DateTime) onDateSelected,) async {
     final DateTime? selectedDate = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
@@ -68,7 +246,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
 
   @override
   void dispose() {
-    // Очистка контроллеров при уничтожении виджета
+    _amountIssuedController.removeListener(_updateRecognizedAmount);
     _dateReceivedController.dispose();
     _amountIssuedController.dispose();
     _dateApprovedController.dispose();
@@ -94,49 +272,52 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            // Первая строка с выпадающими списками и текстовыми полями
+            // Первая строка
             Row(
               children: [
-                // Выпадающее окно для выбора филиала
-                Expanded(
-                  child: Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: DropdownButton<int>(
-                        hint: Text('Филиал', style: TextStyle(fontSize: 14)),
-                        value: selectedDepartmentId,
-                        onChanged: (newId) {
-                          setState(() {
-                            selectedDepartmentId = newId;
-                            selectedDepartment = departmentProvider.departments
-                                .firstWhere((dept) => dept.id == newId);
-                          });
-                        },
-                        items: departmentProvider.departments.map((dept) {
-                          return DropdownMenuItem(
-                            value: dept.id,
-                            child:
-                                Text(dept.name, style: TextStyle(fontSize: 14)),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                  ),
-                ),
-                SizedBox(width: 10), // Отступ между элементами
+                // Филиал
+                // Expanded(
+                //   child: Card(
+                //     child: Padding(
+                //       padding: const EdgeInsets.all(8.0),
+                //       child: DropdownButton<int>(
+                //         isExpanded: true,
+                //         hint: Text('Филиал',
+                //             style: TextStyle(fontSize: 14),
+                //             overflow: TextOverflow.ellipsis),
+                //         value: selectedDepartmentId,
+                //         onChanged: (newId) {
+                //           setState(() {
+                //             selectedDepartmentId = newId;
+                //             selectedDepartment = departmentProvider.departments
+                //                 .firstWhere((dept) => dept.id == newId);
+                //           });
+                //         },
+                //         items: departmentProvider.departments.map((dept) {
+                //           return DropdownMenuItem(
+                //             value: dept.id,
+                //             child: Text(dept.name,
+                //                 style: TextStyle(fontSize: 14),
+                //                 overflow: TextOverflow.ellipsis),
+                //           );
+                //         }).toList(),
+                //       ),
+                //     ),
+                //   ),
+                // ),
+                // SizedBox(width: 10),
 
-                // Текстовое поле для "Дата получения д/с"
+                // Дата получения
                 Expanded(
                   child: InkWell(
                     onTap: () =>
                         _selectDate(context, _dateReceivedController, (date) {
-                      selectedDateReceived = date;
-                    }),
+                          selectedDateReceived = date;
+                        }),
                     child: Card(
                       child: Padding(
                         padding: const EdgeInsets.all(8.0),
                         child: AbsorbPointer(
-                          // Отключаем возможность редактирования текста
                           child: TextField(
                             controller: _dateReceivedController,
                             decoration: InputDecoration(
@@ -152,9 +333,9 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                   ),
                 ),
 
-                SizedBox(width: 10), // Отступ между элементами
+                SizedBox(width: 10),
 
-                // Текстовое поле для "Выданная сумма"
+                // Выданная сумма
                 Expanded(
                   child: Card(
                     child: Padding(
@@ -167,26 +348,34 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                           border: InputBorder.none,
                         ),
                         style: TextStyle(fontSize: 14),
-                        keyboardType: TextInputType.number, // Для ввода чисел
+                        keyboardType: TextInputType.number,
+                        onChanged: (value) {
+                          if (_recognizedAmountController.text.isEmpty ||
+                              _recognizedAmountController.text ==
+                                  _getPreviousAmountIssued()) {
+                            setState(() {
+                              _recognizedAmountController.text = value;
+                            });
+                          }
+                          _setPreviousAmountIssued(value);
+                        },
                       ),
                     ),
                   ),
                 ),
-                SizedBox(width: 10), // Отступ между элементами
+                SizedBox(width: 10),
 
-                // Текстовое поле для "Дата утверждения а/о"
+                // Дата утверждения
                 Expanded(
                   child: InkWell(
                     onTap: () =>
                         _selectDate(context, _dateApprovedController, (date) {
-                      selectedDateApproved = date;
-                    }),
-                    // Выбор даты
+                          selectedDateApproved = date;
+                        }),
                     child: Card(
                       child: Padding(
                         padding: const EdgeInsets.all(8.0),
                         child: AbsorbPointer(
-                          // Отключаем возможность редактирования текста
                           child: TextField(
                             controller: _dateApprovedController,
                             decoration: InputDecoration(
@@ -195,22 +384,25 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                               border: InputBorder.none,
                             ),
                             style: TextStyle(fontSize: 14),
-                            readOnly: true, // Делаем поле только для чтения
+                            readOnly: true,
                           ),
                         ),
                       ),
                     ),
                   ),
                 ),
-                SizedBox(width: 10), // Отступ между элементами
+                SizedBox(width: 10),
 
-                // Выпадающее окно для выбора должности
+                // Должность
                 Expanded(
                   child: Card(
                     child: Padding(
                       padding: const EdgeInsets.all(8.0),
                       child: DropdownButton<int>(
-                        hint: Text('Должность', style: TextStyle(fontSize: 14)),
+                        isExpanded: true,
+                        hint: Text('Должность',
+                            style: TextStyle(fontSize: 14),
+                            overflow: TextOverflow.ellipsis),
                         value: selectedJobId,
                         onChanged: (newId) {
                           setState(() {
@@ -222,8 +414,9 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                         items: jobProvider.jobs.map((job) {
                           return DropdownMenuItem(
                             value: job.id,
-                            child:
-                                Text(job.name, style: TextStyle(fontSize: 14)),
+                            child: Text(job.name,
+                                style: TextStyle(fontSize: 14),
+                                overflow: TextOverflow.ellipsis),
                           );
                         }).toList(),
                       ),
@@ -232,18 +425,21 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                 ),
               ],
             ),
-            SizedBox(height: 20), // Отступ между элементами
+            SizedBox(height: 20),
 
-            // Вторая строка с выпадающими списками и текстовыми полями
+            // Вторая строка
             Row(
               children: [
-                // Выпадающее окно для выбора сотрудника
+                // Сотрудник
                 Expanded(
                   child: Card(
                     child: Padding(
                       padding: const EdgeInsets.all(8.0),
                       child: DropdownButton<int>(
-                        hint: Text('Сотрудник', style: TextStyle(fontSize: 14)),
+                        isExpanded: true,
+                        hint: Text('Сотрудник',
+                            style: TextStyle(fontSize: 14),
+                            overflow: TextOverflow.ellipsis),
                         value: selectedEmployeeId,
                         onChanged: (newId) {
                           setState(() {
@@ -256,35 +452,58 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                           return DropdownMenuItem(
                             value: employee.id,
                             child: Text(employee.name,
-                                style: TextStyle(fontSize: 14)),
+                                style: TextStyle(fontSize: 14),
+                                overflow: TextOverflow.ellipsis),
                           );
                         }).toList(),
                       ),
                     ),
                   ),
                 ),
-                SizedBox(width: 10), // Отступ между элементами
+                SizedBox(width: 10),
 
-                // Текстовое поле для "Назначение"
+                // Назначение
                 Expanded(
                   child: Card(
                     child: Padding(
                       padding: const EdgeInsets.all(8.0),
-                      child: TextField(
-                        controller: _purposeController,
-                        decoration: InputDecoration(
-                          labelText: 'Назначение',
-                          labelStyle: TextStyle(fontSize: 14),
-                          border: InputBorder.none,
-                        ),
-                        style: TextStyle(fontSize: 14),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _purposeController,
+                              decoration: InputDecoration(
+                                labelText: 'Назначение',
+                                labelStyle: TextStyle(fontSize: 14),
+                                border: InputBorder.none,
+                                hintText: 'Введите или выберите шаблон',
+                              ),
+                              style: TextStyle(fontSize: 14),
+                              maxLines: 3,
+                              minLines: 1,
+                            ),
+                          ),
+                          MouseRegion(
+                            cursor: SystemMouseCursors.click,
+                            child: GestureDetector(
+                              onTap: () {
+                                _showPurposeDialog(context);
+                              },
+                              child: Container(
+                                padding: EdgeInsets.all(4),
+                                child: Icon(
+                                    Icons.list, size: 10, color: Colors.blue),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
                 ),
-                SizedBox(width: 10), // Отступ между элементами
+                SizedBox(width: 10),
 
-                // Текстовое поле для "Признанная сумма затрат по а/о"
+                // Признанная сумма
                 Expanded(
                   child: Card(
                     child: Padding(
@@ -297,20 +516,23 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                           border: InputBorder.none,
                         ),
                         style: TextStyle(fontSize: 14),
-                        keyboardType: TextInputType.number, // Для ввода чисел
+                        keyboardType: TextInputType.number,
                       ),
                     ),
                   ),
                 ),
-                SizedBox(width: 10), // Отступ между элементами
+                SizedBox(width: 10),
 
-                // Выпадающее окно для выбора счета
+                // Счет
                 Expanded(
                   child: Card(
                     child: Padding(
                       padding: const EdgeInsets.all(8.0),
                       child: DropdownButton<int>(
-                        hint: Text('Счет', style: TextStyle(fontSize: 14)),
+                        isExpanded: true,
+                        hint: Text('Счет',
+                            style: TextStyle(fontSize: 14),
+                            overflow: TextOverflow.ellipsis),
                         value: selectedAccountId,
                         onChanged: (newId) {
                           setState(() {
@@ -323,16 +545,17 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                           return DropdownMenuItem(
                             value: account.id,
                             child: Text(account.name,
-                                style: TextStyle(fontSize: 14)),
+                                style: TextStyle(fontSize: 14),
+                                overflow: TextOverflow.ellipsis),
                           );
                         }).toList(),
                       ),
                     ),
                   ),
                 ),
-                SizedBox(width: 10), // Отступ между элементами
+                SizedBox(width: 10),
 
-                // Текстовое поле для "Комментарии"
+                // Комментарии
                 Expanded(
                   child: Card(
                     child: Padding(
@@ -351,9 +574,9 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                 ),
               ],
             ),
-            SizedBox(height: 20), // Отступ между элементами
+            SizedBox(height: 20),
 
-            // Кнопки "Создать отчет" и "Просмотр" в один ряд
+            // Кнопки
             Row(
               children: [
                 Expanded(
@@ -363,10 +586,8 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                           selectedJobId != null &&
                           selectedEmployeeId != null &&
                           selectedAccountId != null &&
-                          selectedDateReceived !=
-                              null && // Проверка на null для даты получения
+                          selectedDateReceived != null &&
                           selectedDateApproved != null) {
-                        // Проверка на null для даты утверждения) {
                         reportProvider
                             .createReport(
                           departmentId: selectedDepartmentId!,
@@ -384,7 +605,6 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(content: Text('Отчет успешно создан!')),
                           );
-                          // Очищаем поля
                           setState(() {
                             selectedDepartmentId = null;
                             selectedJobId = null;
@@ -396,12 +616,13 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                             _purposeController.clear();
                             _recognizedAmountController.clear();
                             _commentsController.clear();
+                            _initializeDefaultValues();
                           });
                         }).catchError((error) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                                 content:
-                                    Text('Ошибка при создании отчета: $error')),
+                                Text('Ошибка при создании отчета: $error')),
                           );
                         });
                       } else {
@@ -415,15 +636,13 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                     child: Text('Создать отчет'),
                   ),
                 ),
-                SizedBox(width: 10), // Отступ между кнопками
+                SizedBox(width: 10),
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () {
                       setState(() {
-                        _showViewFields =
-                            !_showViewFields; // Переключаем отображение полей
+                        _showViewFields = !_showViewFields;
                         if (_showViewFields) {
-                          // Добавляем текущие значения в список для отображения
                           _viewFields.add({
                             'Филиал': selectedDepartment?.name ?? 'Не выбран',
                             'Должность': selectedJob?.name ?? 'Не выбран',
@@ -432,10 +651,10 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                             'Дата получения д/с': _dateReceivedController.text,
                             'Выданная сумма': _amountIssuedController.text,
                             'Дата утверждения а/о':
-                                _dateApprovedController.text,
+                            _dateApprovedController.text,
                             'Назначение': _purposeController.text,
                             'Признанная сумма затрат по а/о':
-                                _recognizedAmountController.text,
+                            _recognizedAmountController.text,
                             'Комментарии': _commentsController.text,
                           });
                         }
@@ -447,7 +666,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
               ],
             ),
 
-            // Отображение полей просмотра
+            // Просмотр
             if (_showViewFields)
               Column(
                 children: _viewFields.map((field) {
@@ -460,18 +679,18 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
     );
   }
 
-  // Метод для создания строки просмотра
   Widget _buildViewRow(Map<String, String> field) {
     return Card(
       margin: EdgeInsets.symmetric(vertical: 5),
       child: Row(
         children: [
-          // Поля в строке
           Expanded(
-            child: Row(
-              children: field.entries.map((entry) {
-                return Expanded(
-                  child: Padding(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: field.entries.map((entry) {
+                  return Container(
+                    width: 150, // Фиксированная ширина для каждого поля
                     padding: const EdgeInsets.all(8.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -484,21 +703,19 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                         Text(
                           entry.value,
                           style: TextStyle(fontSize: 12),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
-                  ),
-                );
-              }).toList(),
+                  );
+                }).toList(),
+              ),
             ),
           ),
-
-          // Иконка "Удалить"
           IconButton(
             icon: Icon(Icons.delete, color: Colors.red),
             onPressed: () {
-              _showDeleteDialog(
-                  field); // Показываем диалоговое окно для подтверждения удаления
+              _showDeleteDialog(field);
             },
           ),
         ],
@@ -506,7 +723,6 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
     );
   }
 
-  // Метод для отображения диалогового окна удаления
   void _showDeleteDialog(Map<String, String> field) {
     showDialog(
       context: context,
@@ -517,22 +733,59 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(context); // Закрыть диалоговое окно
+                Navigator.pop(context);
               },
               child: Text('Отмена'),
             ),
             TextButton(
               onPressed: () {
                 setState(() {
-                  _viewFields.remove(field); // Удаляем строку из списка
+                  _viewFields.remove(field);
                 });
-                Navigator.pop(context); // Закрыть диалоговое окно
+                Navigator.pop(context);
               },
               child: Text('Удалить', style: TextStyle(color: Colors.red)),
             ),
           ],
         );
       },
+    );
+  }
+
+  void _showPurposeDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) =>
+          AlertDialog(
+            title: Text('Выбери шаблон назначения'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: purposeTemplates.length,
+                itemBuilder: (context, index) {
+                  return ListTile(
+                    title: Text(
+                      purposeTemplates[index],
+                      style: TextStyle(fontSize: 14),
+                    ),
+                    onTap: () {
+                      setState(() {
+                        _purposeController.text = purposeTemplates[index];
+                      });
+                      Navigator.pop(context);
+                    },
+                  );
+                },
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('Отмена'),
+              ),
+            ],
+          ),
     );
   }
 }

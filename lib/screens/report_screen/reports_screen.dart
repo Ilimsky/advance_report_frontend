@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../providers/report_provider.dart';
-import '../../service/auth_service.dart';
 import 'reports_table.dart';
 import 'reports_search.dart';
 
@@ -31,8 +30,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final authService = Provider.of<AuthService>(context); // ← ДОБАВИТЬ
-    final reportProvider = Provider.of<ReportProvider>(context);
 
     return Scaffold(
       appBar: AppBar(title: Text('Отчеты')),
